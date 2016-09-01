@@ -410,6 +410,8 @@ static const struct of_dev_auxdata imx6q_auxdata_lookup[] __initconst = {
 
 static void __init imx6q_init_machine(void)
 {
+
+	printk("\nAmbika inside imx6q_init_machine");
 	struct device *parent;
 
 	if (cpu_is_imx6q() && imx_get_soc_revision() == IMX_CHIP_REVISION_2_0)
@@ -426,12 +428,13 @@ static void __init imx6q_init_machine(void)
 
 	of_platform_populate(NULL, of_default_bus_match_table,
 					imx6q_auxdata_lookup, parent);
-
+	printk("\nAmbika before enet init");
 	imx6q_enet_init();
 	imx_anatop_init();
 	imx6q_csi_mux_init();
 	cpu_is_imx6q() ?  imx6q_pm_init() : imx6dl_pm_init();
 	imx6q_mini_pcie_init();
+	printk("\nAmbika end of init machine");
 }
 
 #define OCOTP_CFG3			0x440
@@ -545,6 +548,7 @@ static void __init imx6q_init_late(void)
 
 static void __init imx6q_map_io(void)
 {
+	printk("Ambika inside imx6q_map_io");
 	debug_ll_io_init();
 	imx_scu_map_io();
 	imx6_pm_map_io();
@@ -555,6 +559,7 @@ static void __init imx6q_map_io(void)
 
 static void __init imx6q_init_irq(void)
 {
+	printk("\nAmbika inside imx6q_init_irq");
 	imx_init_revision_from_anatop();
 	imx_init_l2cache();
 	imx_src_init();

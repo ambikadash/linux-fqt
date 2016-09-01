@@ -379,6 +379,7 @@ static noinline void __init_refok rest_init(void)
 	 * the init task will end up wanting to create kthreads, which, if
 	 * we schedule it before we create kthreadd, will OOPS.
 	 */
+	printk("\nAmbika inside rest_init calling kernel_init");
 	kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND);
 	numa_default_policy();
 	pid = kernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES);
@@ -485,8 +486,11 @@ asmlinkage void __init start_kernel(void)
 	 * Need to run as early as possible, to initialize the
 	 * lockdep hash:
 	 */
+	printk("Ambika start kernel");
 	lockdep_init();
+	printk("Ambika start kernel1");
 	smp_setup_processor_id();
+	printk("Ambika start kernel2");
 	debug_objects_early_init();
 
 	/*
@@ -654,6 +658,7 @@ asmlinkage void __init start_kernel(void)
 	ftrace_init();
 
 	/* Do the rest non-__init'ed, we're now alive */
+	printk("\nAmbika calling rest_init");
 	rest_init();
 }
 
@@ -770,9 +775,15 @@ static void __init do_initcall_level(int level)
 static void __init do_initcalls(void)
 {
 	int level;
+	printk("\nAmbika Starting do_initcalls");
 
 	for (level = 0; level < ARRAY_SIZE(initcall_levels) - 1; level++)
+	{
+		printk("\nAmbika do_initcall level-%d", level);
 		do_initcall_level(level);
+	}
+	printk("\nAmbika End of  do_initcalls");
+	
 }
 
 /*
@@ -791,6 +802,7 @@ static void __init do_basic_setup(void)
 	init_irq_proc();
 	do_ctors();
 	usermodehelper_enable();
+	printk("\nAmbika calling do_initcalls");
 	do_initcalls();
 	random_int_secret_init();
 }
@@ -816,6 +828,7 @@ void __init load_default_modules(void)
 
 static int run_init_process(const char *init_filename)
 {
+	printk("\nAmbika inside run_init_process");
 	argv_init[0] = init_filename;
 	return do_execve(getname_kernel(init_filename),
 		(const char __user *const __user *)argv_init,
@@ -852,6 +865,8 @@ static int __ref kernel_init(void *unused)
 
 	flush_delayed_fput();
 
+	printk("\nAmbika before ramdisk_execute_command");
+
 	if (ramdisk_execute_command) {
 		ret = run_init_process(ramdisk_execute_command);
 		if (!ret)
@@ -859,6 +874,7 @@ static int __ref kernel_init(void *unused)
 		pr_err("Failed to execute %s (error %d)\n",
 		       ramdisk_execute_command, ret);
 	}
+	printk("\nAmbika after ramdisk_execute_command");
 
 	/*
 	 * We try each of these until one succeeds.
@@ -911,8 +927,10 @@ static noinline void __init kernel_init_freeable(void)
 
 	smp_init();
 	sched_init_smp();
+	printk("\nAmbika inside kernel_init_freeable calling do_basic_setup");
 
 	do_basic_setup();
+	printk("\nAmbika End of do_basic_setup");
 
 	/* Open the /dev/console on the rootfs, this should never fail */
 	if (sys_open((const char __user *) "/dev/console", O_RDWR, 0) < 0)
@@ -920,6 +938,8 @@ static noinline void __init kernel_init_freeable(void)
 
 	(void) sys_dup(0);
 	(void) sys_dup(0);
+
+	printk("\nAmbika after sys_dup");
 	/*
 	 * check if there is an early userspace init.  If yes, let it do all
 	 * the work
@@ -932,6 +952,7 @@ static noinline void __init kernel_init_freeable(void)
 		ramdisk_execute_command = NULL;
 		prepare_namespace();
 	}
+	printk("\nAmbika after ramdisk_execute_command/prepare_namespace");
 
 	/*
 	 * Ok, we have completed the initial bootup, and

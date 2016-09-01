@@ -967,4 +967,12 @@ config TOUCHSCREEN_ZFORCE
 	  To compile this driver as a module, choose M here: the
 	  module will be called zforce_ts.
 
+config TOUCHSCREEN_OSD2168
+        tristate "OSD070T2168-58TS i2c TSI"
+        depends on I2C
+        help
+          Say y here to support the touchscreen found on
+          SSL over I2C
+
+
 endif

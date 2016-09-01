@@ -58,3 +58,6 @@ obj-$(CONFIG_SRAM)		+= sram.o
 obj-y				+= mic/
 obj-$(CONFIG_GENWQE)		+= genwqe/
 obj-$(CONFIG_UID_CPUTIME)       += uid_cputime.o
+obj-$(CONFIG_PWM_IMX)         += pwm_generic.o
+obj-$(CONFIG_UIB_HUB)          += uibhub.o
+

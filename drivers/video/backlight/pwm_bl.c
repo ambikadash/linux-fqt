@@ -103,6 +103,7 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
 	int brightness = bl->props.brightness;
 	int duty_cycle;
 
+/* don't blank the backlight so we can drain the power supply in S3 mode
 	if (bl->props.power != FB_BLANK_UNBLANK ||
 	    bl->props.fb_blank != FB_BLANK_UNBLANK ||
 	    bl->props.state & BL_CORE_FBBLANK)
@@ -110,6 +111,7 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
 
 	if (pb->notify)
 		brightness = pb->notify(pb->dev, brightness);
+*/
 
 	if (brightness > 0) {
 		duty_cycle = compute_duty_cycle(pb, brightness);

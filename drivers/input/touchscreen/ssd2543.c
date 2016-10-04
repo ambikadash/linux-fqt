@@ -33,8 +33,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-# include <linux/earlysuspend.h>
+#ifdef CONFIG_PM_SLEEP
 # include <linux/suspend.h>
 #endif
 //#include <mach/hardware.h>
@@ -142,8 +141,7 @@ struct ssl_ts_priv {
 	struct i2c_client	*client;
 	spinlock_t			lock;
 	int					irq;
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend early_suspend;
+#ifdef CONFIG_PM_SLEEP
 	bool				suspended;
 #endif 
 };
@@ -330,18 +328,6 @@ static void ssd_ts_work(struct work_struct *work)
 	int FingerP[FINGERNO];
 	int ret;
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	if (ts->suspended) {
-		extern void request_suspend_state(suspend_state_t state);
-
-		request_suspend_state(PM_SUSPEND_ON);
-		input_report_key(ts->input, KEY_INFO, 1);
-		input_report_key(ts->input, KEY_INFO, 0);
-		input_sync(ts->input);
-		ts->suspended = false;
-	}
-#endif
-
 	// read i2c data from device
 	ret = ssd_i2c_read(ts->client, EVENT_STATUS, buf, 2);
 	if(ret < 0)
@@ -406,7 +392,7 @@ static void ssd_ts_work(struct work_struct *work)
 			input_report_key(ts->input, BTN_TOUCH, 1);
 			input_mt_sync(ts->input);
 			//printk(&ts->client->dev, "%s, ID:%d X:%d Y:%d Z:%d\n", __func__, i, xpos, ypos,width);
-			printk("%s, ID:%d X:%d Y:%d Z:%d ifpart\n", __func__, i, xpos, ypos,width);
+			//printk("%s, ID:%d X:%d Y:%d Z:%d ifpart\n", __func__, i, xpos, ypos,width);
 		}
 		else if (EventChange)				// touch up
 		{
@@ -414,7 +400,7 @@ static void ssd_ts_work(struct work_struct *work)
 			input_report_abs(ts->input, ABS_MT_TRACKING_ID, i);
 			input_report_key(ts->input, BTN_TOUCH, 0);
 			input_mt_sync(ts->input);
-			printk("%s, ID:%d X:%d Y:%d Z:%d\n", __func__, i, xpos, ypos,width);
+			//printk("%s, ID:%d X:%d Y:%d Z:%d\n", __func__, i, xpos, ypos,width);
 		}
 
 		#else	// MT_SUPPORT
@@ -427,7 +413,7 @@ static void ssd_ts_work(struct work_struct *work)
 				input_report_abs(ts->input, ABS_PRESSURE, width);
 				input_report_key(ts->input, BTN_TOUCH, 1);
 				send_report = 1;
-				printk(&ts->client->dev, "%s, ID:%d X:%d Y:%d Z:%d\n", __func__, i, xpos, ypos,width);
+				//printk(&ts->client->dev, "%s, ID:%d X:%d Y:%d Z:%d\n", __func__, i, xpos, ypos,width);
 
 			}
 			else if (EventChange)				// touch up/down change
@@ -436,7 +422,7 @@ static void ssd_ts_work(struct work_struct *work)
 				ypos = 0;
 				input_report_key(ts->input, BTN_TOUCH, 0);
 				send_report = 1;
-				printk(&ts->client->dev, "%s, ID:%d X:%d Y:%d Z:%d\n", __func__, i, xpos, ypos,width);
+				//printk(&ts->client->dev, "%s, ID:%d X:%d Y:%d Z:%d\n", __func__, i, xpos, ypos,width);
 			}
 		}
 		#endif	// MT_SUPPORT
@@ -458,6 +444,26 @@ static irqreturn_t ssd_ts_irq(int irq, void *handle)
 
 	dev_dbg(&ts->client->dev, "%s\n", __func__);
 	queue_work(ssd2543_wq, &ts->ssl_work);
+	//printk("\n Before calling wake-up code");
+#ifdef CONFIG_PM_SLEEP
+	if (ts->suspended) {
+		pm_wakeup_event(&ts->client->dev, 500);
+		input_report_key(ts->input, KEY_INFO, 1);
+		input_report_key(ts->input, KEY_INFO, 0);
+		input_sync(ts->input);
+		ts->suspended = false;
+		printk("\n Touchscreen was suspended");
+	}
+	/*else
+	{
+		//pm_wakeup_event(&ts->client->dev, 500);
+                input_report_key(ts->input, KEY_INFO, 1);
+                input_report_key(ts->input, KEY_INFO, 0);
+                input_sync(ts->input);
+                ts->suspended = false;
+		//printk("\n Touchscreen not suspended");
+	}*/
+#endif
 
 	return IRQ_HANDLED;
 }
@@ -472,21 +478,23 @@ static enum hrtimer_restart ssd_ts_timer(struct hrtimer *timer)
 	return HRTIMER_NORESTART;
 }
 #endif
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#define IMX_GPIO_NR(bank, nr)           (((bank) - 1) * 32 + (nr))
+#ifdef CONFIG_PM_SLEEP
 
 #define UIB_LCD_LED_EN          IMX_GPIO_NR(7, 12)
 #define UIB_LCD_PWR_INH IMX_GPIO_NR(3, 20)
 #define UIB_LCD_STBYB IMX_GPIO_NR(3, 25)
 #define UIB_LCD_RESET IMX_GPIO_NR(3, 27)
 
-static void ssd2543_ts_late_resume(struct early_suspend *early_s)
+static int ssd2543_ts_resume(struct device *dev)
 {
+	struct i2c_client *client = to_i2c_client(dev);
+	struct ssl_ts_priv *ts = i2c_get_clientdata(client);
 	unsigned char buf[4]={0};
 	int i;
-	struct ssl_ts_priv *ts = container_of(early_s, struct ssl_ts_priv, early_suspend);
 
 	dev_info(&ts->client->dev, "%s\n", __func__);
+	printk("ssd2543_ts_resume called\n");
 
 #ifdef CONFIG_MX6DL_UIB_REV_2
 	// power up LCD panel
@@ -505,12 +513,15 @@ static void ssd2543_ts_late_resume(struct early_suspend *early_s)
 		buf[1] = Resume[i].Data2;
 		ssd_i2c_write(ts->client, Resume[i].Reg, buf, Resume[i].No);
 	}
+	return 0;
 }
-static void ssd2543_ts_early_suspend(struct early_suspend *early_s)
+static int ssd2543_ts_suspend(struct device *dev)
 {
+	printk("ssd2543_ts_suspend called\n");
+	struct i2c_client *client = to_i2c_client(dev);
+	struct ssl_ts_priv *ts = i2c_get_clientdata(client);
 	unsigned char buf[4]={0};
 	int i;
-	struct ssl_ts_priv *ts = container_of(early_s, struct ssl_ts_priv, early_suspend);
 
 	dev_info(&ts->client->dev, "%s\n", __func__);
 	ts->suspended = true;
@@ -531,8 +542,17 @@ static void ssd2543_ts_early_suspend(struct early_suspend *early_s)
 
 	// enable system wakeup on the touch panel's IRQ
 	enable_irq_wake(ts->irq);
+	return 0;
 }
-#endif /* CONFIG_HAS_EARLYSUSPEND */
+
+static const struct dev_pm_ops ssd2543_ts_pm_ops = {
+        SET_SYSTEM_SLEEP_PM_OPS(ssd2543_ts_suspend, ssd2543_ts_resume)
+        SET_RUNTIME_PM_OPS(ssd2543_ts_suspend, ssd2543_ts_resume, NULL)
+};
+
+//static SIMPLE_DEV_PM_OPS(ssd2543_ts_pm_ops, ssd2543_ts_suspend, ssd2543_ts_resume);
+
+#endif /* CONFIG_PM_SLEEP */
 
 /*
  * /sys/bus/i2c/drivers/ssd2543
@@ -653,9 +673,15 @@ static const struct attribute_group *ssd2543_sysfs_attr_groups[] = {
     &ssd2543_sysfs_files,
     NULL
 };
-#define IMX_GPIO_NR(bank, nr)           (((bank) - 1) * 32 + (nr))
 #define UIB_TOUCH_RESET  IMX_GPIO_NR(3, 24)
 #define UIB_TOUCH_IRQ    IMX_GPIO_NR(3, 23)
+
+int get_ssd_irq(void)
+{
+	printk("Ambika: Inside get_ssd_irq\n");
+        return gpio_get_value(UIB_TOUCH_IRQ);
+}
+
 
 static int ssd2543_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
@@ -779,12 +805,8 @@ static int ssd2543_probe(struct i2c_client *client,
 		goto err_free_irq;
 	}
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#ifdef CONFIG_PM_SLEEP
 	ts->suspended = false;
-	ts->early_suspend.suspend = ssd2543_ts_early_suspend;
-	ts->early_suspend.resume  = ssd2543_ts_late_resume;
-	ts->early_suspend.level   = EARLY_SUSPEND_LEVEL_BLANK_SCREEN-2;
-	register_early_suspend(&ts->early_suspend);
 #endif
 
 	ssd_i2c_client = client;
@@ -844,6 +866,9 @@ static struct i2c_driver ssd2543_driver = {
 		.owner	= THIS_MODULE,
 		.name	= "ssd2543",
 		.of_match_table = ssd2543_ts_dt_ids,
+#ifdef CONFIG_PM_SLEEP
+        	.pm = &ssd2543_ts_pm_ops,
+#endif
 	},
 	.id_table	= ssd2543_idtable,
 	.probe		= ssd2543_probe,

@@ -44,6 +44,7 @@
 #include <linux/of.h>
 #include <linux/regmap.h>
 #include <linux/regulator/of_regulator.h>
+#include "internal.h"
 
 /*
  * STOP -- LOOK at the hardware!  UPDATE these voltage tables!
@@ -618,7 +619,7 @@ static int ltc_3676_reg_write(struct ltc3676_regulator *ltc, u8 reg, u8 val)
 		case REGULATOR_MODE_IDLE:
 		case REGULATOR_MODE_STANDBY:
 			/* Burst mode, value of 01 for bits 6/5, highest light load efficiency */
-			/*return_value = ltc_3676_clear_bits(ltc, (LTC3676_REG_BUCK1+reg_offset), BIT_6_MASK);
+		/*	return_value = ltc_3676_clear_bits(ltc, (LTC3676_REG_BUCK1+reg_offset), BIT_6_MASK);
 			if (return_value < 0)
 				return return_value;
 			return ltc_3676_set_bits(ltc, (LTC3676_REG_BUCK1+reg_offset), BIT_5_MASK);
@@ -667,7 +668,7 @@ static unsigned int ltc3676_dcdc_get_mode(struct regulator_dev *dev)
 return 0;
 }
  
-int lookUpTable(int table, int min_uV, int max_uV)
+/*int lookUpTable(int table, int min_uV, int max_uV)
 {
 	int i = 0;
 	for (i=0; i<32; i++)
@@ -1337,7 +1338,7 @@ enum ltc3676_reg {
 	LTC3676_SW1,
 	LTC3676_SW2,
 	LTC3676_SW3,
-	LTC3676_SW4,
+	LTC3676_vddarmsoc_ext,
 	LTC3676_LDO1,
 	LTC3676_LDO2,
 	LTC3676_LDO3,
@@ -1389,6 +1390,12 @@ static int ltc3676_set_suspend_voltage(struct regulator_dev *rdev, int uV)
 				  rdev->desc->vsel_mask, sel);
 }
 
+int ltc3676_set_suspend_voltage_ex(struct regulator *reg, int uV)
+{
+	return ltc3676_set_suspend_voltage(reg->rdev, uV);
+}
+EXPORT_SYMBOL_GPL(ltc3676_set_suspend_voltage_ex);
+
 static int ltc3676_set_suspend_mode(struct regulator_dev *rdev,
 				    unsigned int mode)
 {
@@ -1437,6 +1444,8 @@ static struct regulator_ops ltc3676_linear_regulator_ops =
 	.list_voltage = regulator_list_voltage_linear,
 	.set_voltage_sel = regulator_set_voltage_sel_regmap,
 	.get_voltage_sel = regulator_get_voltage_sel_regmap,
+	.get_voltage = regulator_get_voltage,
+        .set_voltage = regulator_set_voltage,
 	.set_suspend_voltage = ltc3676_set_suspend_voltage,
 	.set_suspend_mode = ltc3676_set_suspend_mode,
 };
@@ -1477,7 +1486,7 @@ static struct ltc3676_regulator ltc3676_regulators[LTC3676_NUM_REGULATORS] = {
 	LTC3676_LINEAR_REG(SW1, BUCK1, DVB1A),
 	LTC3676_LINEAR_REG(SW2, BUCK2, DVB2A),
 	LTC3676_LINEAR_REG(SW3, BUCK3, DVB3A),
-	LTC3676_LINEAR_REG(SW4, BUCK4, DVB4A),
+	LTC3676_LINEAR_REG(vddarmsoc_ext, BUCK4, DVB4A),
 	LTC3676_FIXED_REG(LDO1),
 	LTC3676_FIXED_REG(LDO2),
 	LTC3676_FIXED_REG(LDO3),
@@ -1489,7 +1498,7 @@ static struct of_regulator_match ltc3676_matches[] = {
 	{ .name = "sw1",	},
 	{ .name = "sw2",	},
 	{ .name = "sw3",	},
-	{ .name = "sw4",	},
+	{ .name = "vddarmsoc_ext",	},
 	{ .name = "ldo1",	},
 	{ .name = "ldo2",	},
 	{ .name = "ldo3",	},

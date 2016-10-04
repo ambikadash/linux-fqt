@@ -96,12 +96,12 @@ struct ltc3676_regulator {
 	struct ltc3676_pmic pmic;
 };
 
-int ltc3676_register_regulator(
-		struct ltc3676_regulator *reg_data, int reg,
-		      struct regulator_init_data *initdata);
+//int ltc3676_register_regulator(
+//		struct ltc3676_regulator *reg_data, int reg,
+//		      struct regulator_init_data *initdata);
 
 int ltc3676_set_suspend_voltage_ex(
-		struct ltc3676_regulator *ltc, int dcdc, int uV);
+		struct regulator *reg, int uV);
 
 
 

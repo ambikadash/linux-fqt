@@ -162,13 +162,6 @@
 		status = "okay";
 	};
 
-	mipi_dsi_reset: mipi-dsi-reset {
-		compatible = "gpio-reset";
-		reset-gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
-		reset-delay-us = <50>;
-		#reset-cells = <0>;
-	};
-
 	minipcie_ctrl {
 		power-on-gpio = <&gpio3 19 0>;
 	};
@@ -213,17 +206,6 @@
 		status = "okay";
 	};
 
-	mipi_dsi_reset: mipi-dsi-reset {
-		compatible = "gpio-reset";
-		reset-gpios = <&gpio6 11 GPIO_ACTIVE_LOW>;
-		reset-delay-us = <50>;
-		#reset-cells = <0>;
-	};
-};
-
-&cpu0 {
-	arm-supply = <&sw4_reg>;
-	soc-supply = <&sw4_reg>;
 };
 
 &clks {
@@ -237,70 +219,6 @@
 	pinctrl-0 = <&pinctrl_i2c1>;
 	status = "okay";
 
-	pmic: ltc3676@3c {						// Power Management LTC3676EUJ#PBF
-		compatible = "lltc,ltc3676";
- 		reg = <0x3c>;
-		interrupt-parent = <&gpio6>;
-		interrupts = <27 2>;
- 
- 		regulators {
-			/* VCC_SOC */
-			sw1_reg: sw1 {
-				regulator-min-microvolt = <787500>;
-				regulator-max-microvolt = <1527272>;
-				lltc,fb-voltage-divider = <100000 110000>;
-				regulator-suspend-mem-microvolt = <1040000>;
-				regulator-ramp-delay = <7000>;
- 				regulator-boot-on;
- 				regulator-always-on;
- 			};
-			/* VCC_3V3 */
-			sw2_reg: sw2 {
-				regulator-min-microvolt = <1885714>;
-				regulator-max-microvolt = <3657142>;
-				lltc,fb-voltage-divider = <100000 28000>;
-				regulator-ramp-delay = <7000>;
- 				regulator-boot-on;
- 				regulator-always-on;
- 			};
-			/* VCC_ARM */
-			sw3_reg: sw3 {
-				regulator-min-microvolt = <787500>;
-				regulator-max-microvolt = <1527272>;
-				lltc,fb-voltage-divider = <100000 110000>;
-				regulator-suspend-mem-microvolt = <980000>;
-				regulator-ramp-delay = <7000>;
- 				regulator-boot-on;
- 				regulator-always-on;
- 			};
-			/* VCC_DDR3 */	
-			sw4_reg: sw4 {
-				regulator-min-microvolt = <900000>;
-				regulator-max-microvolt = <1490000>;
-				lltc,fb-voltage-divider = <100000 93100>;
-				regulator-ramp-delay = <7000>;
- 				regulator-boot-on;
- 				regulator-always-on;
- 			};
-			/* VCC_SNVS */
-			ldo1_reg: ldo1 {
-				regulator-min-microvolt = <3240306>;
-				regulator-max-microvolt = <3240306>;
-				lltc,fb-voltage-divider = <102000 29400>;
- 				regulator-boot-on;
- 				regulator-always-on;
- 			};
-			/* VCC_2V5_LDO2 */
-			ldo2_reg: ldo2 {
-				regulator-min-microvolt = <2484708>;
-				regulator-max-microvolt = <2484708>;
-				lltc,fb-voltage-divider = <100000 41200>;
-				regulator-boot-on;
-				regulator-always-on;
- 			};
- 		};
-	};
-
 };
 
 &i2c2 {
@@ -308,7 +226,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
-
 };
 
 &i2c3 {
@@ -319,20 +236,13 @@
 	reset-gpios = <&gpio3 24 0>;
 	reset-active-low;
 
-	egalax_ts@04 {
-		compatible = "eeti,egalax_ts";
-		reg = <0x04>;
-		interrupt-parent = <&gpio3>;
-		interrupts = <23 2>;
-		wakeup-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
-	};
 	
 	ssd2543@48 {
 		compatible = "ssd,ssd2543";
 		reg = <0x48>;
 		interrupt-parent = <&gpio3>;
                 interrupts = <23 3>;
-                wakeup-gpios = <&gpio3 24 GPIO_ACTIVE_LOW>;
+                wakeup-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
 	};
 };
 

@@ -138,6 +138,7 @@ int __init uib_init_i2c(void)
 }
 //subsys_initcall(uib_init_i2c);
 
+
 static __init int ltc3676_pmic_init(void)
 {
 	int i = 0;
@@ -196,15 +197,15 @@ static __init int ltc3676_pmic_init(void)
 	// operations and putting the CPU(s) to sleep.  PMIC_STBY_REQ is
 	// deasserted upon receipt of an unmasked interrupt from the GPC.
 	reg = regulator_get(NULL, "vddarmsoc_ext");
-	ltc = regulator_get_drvdata(reg);
+	//ltc = regulator_get_drvdata(reg);
 /*#ifdef CONFIG_MX6DL_UIB_REV_1
-	ret = ltc3676_set_suspend_voltage_ex(ltc, LTC3676_DCDC_4, 1210000); // @@@ set to 1.21V for testing
+	ret = ltc3676_set_suspend_voltage_ex(reg, 1210000); // @@@ set to 1.21V for testing
 #else
-	ret = ltc3676_set_suspend_voltage_ex(ltc, LTC3676_DCDC_4, 900000); // set to 0.9V for suspend
+	ret = ltc3676_set_suspend_voltage_ex(reg, 1210000); // set to 0.9V for suspend
 #endif*/
 
 err0:
 	return ret;
 }
-late_initcall(ltc3676_pmic_init);
+//late_initcall(ltc3676_pmic_init);
 

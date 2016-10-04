@@ -521,7 +521,7 @@ static int device_resume_noirq(struct device *dev, pm_message_t state)
 static void dpm_resume_noirq(pm_message_t state)
 {
 	ktime_t starttime = ktime_get();
-	/*extern void request_suspend_state(suspend_state_t state);
+	/*extern void request_suspend_state(suspend_state_t state);*/
         extern int get_ssd_irq(void);
 
         // hack alert: this should be handled in the SSD 2543 touch panel
@@ -529,7 +529,11 @@ static void dpm_resume_noirq(pm_message_t state)
         // isn't always long enough for the ISR to get called after waking
         // up all the devices (PHW)
         if (!get_ssd_irq())
-                request_suspend_state(PM_SUSPEND_ON);*/
+	{	
+		printk("Ambika: calling pm_suspend(PM_SUSPEND_ON)");
+		pm_suspend(PM_SUSPEND_ON);
+	}
+                /*request_suspend_state(PM_SUSPEND_ON);*/
 
 
 	mutex_lock(&dpm_list_mtx);

@@ -52,6 +52,7 @@
 #include <linux/regulator/consumer.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
+#include <linux/alarmtimer.h>
 
 #include <asm/irq.h>
 #include <asm/setup.h>
@@ -149,7 +150,7 @@
 #define OBSRV_MUX1_MASK			0x3f
 #define OBSRV_MUX1_ENET_IRQ		0x9
 
-static int board_version = 1;
+static int board_version = 2;
 //#define UOG_PORTSC1         USBOTG_REG32(0x184)
 
 static void sabresd_suspend_enter(void)
@@ -165,47 +166,6 @@ static void sabresd_suspend_exit(void)
 	/* enable RFID */
 	gpio_set_value(UIB_RFID_EN, 1);
 }
-
-
-#if defined(CONFIG_LEDS_TRIGGER) || defined(CONFIG_LEDS_GPIO)
-
-#define GPIO_LED(gpio_led, name_led, act_low, state_suspend, trigger)	\
-{									\
-	.gpio			= gpio_led,				\
-	.name			= name_led,				\
-	.active_low		= act_low,				\
-	.retain_state_suspended = state_suspend,			\
-	.default_state		= 0,					\
-	.default_trigger	= trigger,		\
-}
-
-static struct gpio_led imx6q_gpio_leds[] = {
-	/* set 4th argument to 1 to keep LED on during suspend */
-	GPIO_LED(UIB_LED0, "led0", 0, 1, ""),
-};
-
-static struct gpio_led_platform_data imx6q_gpio_leds_data = {
-	.leds		= imx6q_gpio_leds,
-	.num_leds	= ARRAY_SIZE(imx6q_gpio_leds),
-};
-
-static struct platform_device imx6q_gpio_led_device = {
-	.name		= "leds-gpio",
-	.id		= -1,
-	.num_resources  = 0,
-	.dev		= {
-		.platform_data = &imx6q_gpio_leds_data,
-	}
-};
-
-static void __init imx6q_add_device_gpio_leds(void)
-{
-	platform_device_register(&imx6q_gpio_led_device);
-}
-#else
-static void __init imx6q_add_device_gpio_leds(void) {}
-#endif
-
 
 
 #ifdef CONFIG_MX6DL_UIB_REV_2
@@ -292,6 +252,7 @@ static void s3_suspend_callback(struct alarm *alarm)
 
 	wake_unlock(&s3_wake_lock);
 //	request_suspend_state(PM_SUSPEND_MEM);
+	pm_suspend(PM_SUSPEND_MEM);
 }
 
 static void s3_timer_callback(struct alarm *alarm)
@@ -311,6 +272,8 @@ static irqreturn_t s3_irq(int irq, void *handle)
 	int state;
 	ktime_t alarmtime;
 
+	printk("Ambika: S3_irq called \n");
+
 #ifdef USE_FIERY_ON_EN
 	// this is turned on if touch panel wakes up the board
 	// so make sure it's off now
@@ -324,6 +287,7 @@ static irqreturn_t s3_irq(int irq, void *handle)
 	if (!state) {
 		wake_lock(&s3_wake_lock);
 //		request_suspend_state(PM_SUSPEND_ON);
+		pm_suspend(PM_SUSPEND_ON);
 		wakeup_android();
 	}
 	else {
@@ -368,13 +332,13 @@ static irqreturn_t s3_irq(int irq, void *handle)
 		gpio_set_value(UIB_USB_HUB_RESET, 1);
 		mdelay(5);
 #endif
-		/*alarmtime = ktime_add_ns(alarm_get_elapsed_realtime(), (u64) s3_timeout * 1000 * 1000 / 2);
+		alarmtime = ktime_add_ns(ktime_get_real(), (u64) s3_timeout * 1000 * 1000 / 2);
 		printk("setting s3_suspend to fire in %ums\n", s3_timeout / 2);
-		alarm_start_range(&s3_suspend, alarmtime, alarmtime);
+		alarm_start(&s3_suspend, alarmtime);
 
-		alarmtime = ktime_add_ns(alarm_get_elapsed_realtime(), (u64) s3_timeout * 1000 * 1000);
+		alarmtime = ktime_add_ns(ktime_get_real(), (u64) s3_timeout * 1000 * 1000);
 		printk("setting s3_timeout to fire in %ums\n", s3_timeout);
-		alarm_start_range(&s3_timer, alarmtime, alarmtime);*/
+		alarm_start(&s3_timer, alarmtime);
 	}
 
 	return IRQ_HANDLED;
@@ -399,9 +363,11 @@ static int __init s3_irq_init(void)
 	int irq;
 	struct device *dev;
 	spinlock_t lock;
+	
+	printk("Ambika: s3_irq_init called\n");
 
-	//alarm_init(&s3_suspend, ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP, s3_suspend_callback);
-	//alarm_init(&s3_timer, ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP, s3_timer_callback);
+	alarm_init(&s3_suspend, ALARM_REALTIME, s3_suspend_callback);
+	alarm_init(&s3_timer, ALARM_REALTIME, s3_timer_callback);
 
 	wakeup_input = input_allocate_device();
 	if (!wakeup_input) {
@@ -422,6 +388,11 @@ static int __init s3_irq_init(void)
 
 # ifdef UIB_S3_PWR_MODE
 	dev = bus_find_device_by_name(&platform_bus_type, NULL, "leds-gpio");
+
+	if(!dev)
+	{
+		printk(KERN_ERR "failed to find device for cell leds-gpio\n");
+	}
 	dev = device_find_child(dev, "led0", leddev_check);
 	if(dev) {
 		led0_cdev = dev_get_drvdata(dev);
@@ -524,7 +495,7 @@ int __init uib_board_init(void)
 	gpio_direction_output(UIB_LCD_LED_EN, 1);
 
 
-	imx6q_add_device_gpio_leds();
+	//imx6q_add_device_gpio_leds();
 
 	//gpio_request(UIB_TOUCH_RESET, "SSD-RESET");
 	//gpio_request(UIB_TOUCH_IRQ, "SSD-IRQ");
@@ -562,16 +533,22 @@ int __init uib_board_init(void)
 	//imx6q_add_busfreq();
 
 #ifdef CONFIG_MX6DL_UIB_REV_2
-	gpio_request(UIB_FIERY_ON_EN, "fiery-on-enable");
+	int ret = gpio_request(UIB_FIERY_ON_EN, "fiery-on-enable");
+	if(ret)
+                printk("Ambika : UIB_FIERY_ON_EN gpio req failed %d ", ret);
 	gpio_direction_output(UIB_FIERY_ON_EN, 0);
 	gpio_export(UIB_FIERY_ON_EN, false);
 
-	gpio_request(UIB_SERVER_S5, "server-s5");
+	ret = gpio_request(UIB_SERVER_S5, "server-s5");
+	if(ret)
+                printk("Ambika : UIB_SERVER_S5 gpio req failed %d ", ret);
 	gpio_direction_input(UIB_SERVER_S5);
 	gpio_export(UIB_SERVER_S5, false);
 
 # ifdef UIB_S3_PWR_MODE
-	gpio_request(UIB_S3_PWR_MODE, "s3-pwr-mode");
+	int ret1 = gpio_request(UIB_S3_PWR_MODE, "s3-pwr-mode") ;
+	if(ret1)
+		printk("Ambika : UIB_S3_PWR_MODE gpio req failed %d ", ret1);
 	gpio_direction_input(UIB_S3_PWR_MODE);
 	gpio_export(UIB_S3_PWR_MODE, false);
 # endif /* UIB_S3_PWR_MODE */

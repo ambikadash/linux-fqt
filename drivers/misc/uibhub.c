@@ -17,6 +17,8 @@
 # include <linux/earlysuspend.h>
 #endif
 //#include <mach/hardware.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
 
 #define DEVICE_ADDR        0x40
 #define VENDOR_ID_LSB      0x01
@@ -32,6 +34,8 @@ struct uib_hub_priv {
 	struct early_suspend early_suspend;
 #endif 
 };
+#define IMX_GPIO_NR(bank, nr)           (((bank) - 1) * 32 + (nr))
+#define UIB_USB_HUB_RESET    IMX_GPIO_NR(5, 30)
 
 static int hub_i2c_transfer(struct i2c_client *client, struct i2c_msg *msgs, int cnt)
 {
@@ -147,6 +151,7 @@ static int uibhub_probe(struct i2c_client *client,
 	int err = 0;
 	/* reset GPIO NR passed in dev.platform_data */
 	unsigned int *HUB_gpios = (unsigned int *) client->dev.platform_data;
+	printk("Ambika: uibhub_probe called\n");
 
 	dev_err(&client->dev, "%s:\n",__func__);
  
@@ -242,6 +247,11 @@ static int uibhub_remove(struct i2c_client *client)
 	return 0;
 }
 
+static const struct of_device_id uib_dt_ids[] = {
+        { .compatible = "efi,uibhub", },
+        { /* sentinel */ }
+};
+
 static struct i2c_device_id uibhub_idtable[] = {
 	{ "uibhub", 0 },
 	{ }
@@ -252,14 +262,16 @@ MODULE_DEVICE_TABLE(i2c, uibhub_idtable);
 static struct i2c_driver uibhub_driver = {
 	.driver = {
 		.owner	= THIS_MODULE,
-		.name	= "uibhub"
+		.name	= "uibhub",
+		.of_match_table = uib_dt_ids, 
 	},
 	.id_table	= uibhub_idtable,
 	.probe		= uibhub_probe,
-	.remove		= uibhub_remove,
 };
 
-static int __init uibhub_init(void)
+module_i2c_driver(uibhub_driver);
+
+/*static int __init uibhub_init(void)
 {
 	return i2c_add_driver(&uibhub_driver);
 }
@@ -270,7 +282,7 @@ static void __exit uibhub_exit(void)
 }
 
 module_init(uibhub_init);
-module_exit(uibhub_exit);
+module_exit(uibhub_exit);*/
 
 MODULE_AUTHOR("Patrick Wood <pat.wood@efi.com>");
 MODULE_DESCRIPTION("UIB HUB Driver");

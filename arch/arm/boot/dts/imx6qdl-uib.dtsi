@@ -24,10 +24,8 @@
 
 	leds {
 		compatible = "gpio-leds";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_gpio_leds>;
 
-		red {
+		led0 {
 		        gpios = <&gpio1 2 0>;
 		        default-state = "on";
 		};
@@ -166,11 +164,6 @@
 		power-on-gpio = <&gpio3 19 0>;
 	};
 
-    bt_rfkill {
-                compatible = "fsl,mxc_bt_rfkill";
-                        bt-power-gpios = <&gpio1 2 0>;
-                                status ="okay";
-    };
 
 	ramoops_device {
 		compatible = "fsl,mxc_ramoops";
@@ -208,6 +201,10 @@
 
 };
 
+&cpu0 {
+        arm-supply = <&sw4_reg>;
+};
+
 &clks {
 	fsl,ldb-di0-parent = <&clks IMX6QDL_CLK_PLL2_PFD0_352M>;
 	fsl,ldb-di1-parent = <&clks IMX6QDL_CLK_PLL2_PFD0_352M>;
@@ -219,6 +216,11 @@
 	pinctrl-0 = <&pinctrl_i2c1>;
 	status = "okay";
 
+	uibhub@40 {
+		compatible = "efi,uibhub";
+                reg = <0x40>;
+	};
+
 };
 
 &i2c2 {
@@ -226,6 +228,24 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
+
+	pmic: ltc3676@3c {                                              // Power Management LTC3676EUJ#PBF
+                compatible = "lltc,ltc3676";
+                reg = <0x3c>;
+                interrupt-parent = <&gpio6>;
+                interrupts = <27 2>;
+
+                regulators {
+                        sw4_reg: vddarmsoc_ext {
+                                regulator-min-microvolt = <900000>;
+                                regulator-max-microvolt = <1350000>;
+                                lltc,fb-voltage-divider = <100000 113793>;
+                                regulator-ramp-delay = <7000>;
+                                regulator-boot-on;
+                                regulator-always-on;
+                        };
+                };
+        };
 };
 
 &i2c3 {
@@ -324,6 +344,12 @@
 			>;
 		};
 
+		pinctrl_gpio_leds: gpio_leds {
+                        fsl,pins = <
+                                MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x1b0b0
+                        >;
+                };
+
 		pinctrl_pcie: pciegrp {
 			fsl,pins = <
 				MX6QDL_PAD_GPIO_0__GPIO1_IO00	0x1b0b0
@@ -346,12 +372,6 @@
 		pinctrl_usbotg: usbotggrp {
 			fsl,pins = <
 				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
-			>;
-		};
-
-		pinctrl_gpio_leds: gpio_leds {
-			fsl,pins = <
-				MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x1b0b0
 			>;
 		};
 

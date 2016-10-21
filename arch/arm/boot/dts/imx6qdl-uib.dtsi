@@ -353,6 +353,7 @@
 		pinctrl_pcie: pciegrp {
 			fsl,pins = <
 				MX6QDL_PAD_GPIO_0__GPIO1_IO00	0x1b0b0
+				MX6QDL_PAD_KEY_COL4__GPIO4_IO14 0x1b0b0
 			>;
 		};
 

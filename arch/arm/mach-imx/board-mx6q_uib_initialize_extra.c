@@ -53,6 +53,7 @@
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
 #include <linux/alarmtimer.h>
+#include <linux/of_platform.h>
 
 #include <asm/irq.h>
 #include <asm/setup.h>
@@ -76,13 +77,13 @@
  #define UIB_USB_HUB_RESET    IMX_GPIO_NR(5, 30)
 
  // #define TESTS3 // allow S3 signal test on uSD boot jumper
- #ifdef TESTS3
-  #define UIB_S3_PWR_MODE IMX_GPIO_NR(3, 5)		// boot_cfg jumper
-  #define get_S3_PWR_MODE() !gpio_get_value(UIB_S3_PWR_MODE)
- #else
+// #ifdef TESTS3
+ // #define UIB_S3_PWR_MODE IMX_GPIO_NR(3, 5)		// boot_cfg jumper
+  //#define get_S3_PWR_MODE() !gpio_get_value(UIB_S3_PWR_MODE)
+// #else
   #define UIB_S3_PWR_MODE IMX_GPIO_NR(4, 14)
   #define get_S3_PWR_MODE() gpio_get_value(UIB_S3_PWR_MODE)
- #endif
+// #endif
  #define UIB_SERVER_S5 IMX_GPIO_NR(1, 0)
  #define UIB_FIERY_ON_EN IMX_GPIO_NR(4, 9)
 #endif // CONFIG_MX6DL_UIB_REV_1
@@ -230,8 +231,12 @@ module_param(s3_timeout, uint, S_IRUGO | S_IWUSR);
 
 struct led_classdev *led0_cdev;
 
+//extern struct bus_type 
+
 static void s3_work(struct work_struct *dummy)
 {
+	wake_unlock(&s3_wake_lock);
+	pm_suspend(PM_SUSPEND_MEM);
 	// turn up LCD panel's backlight to drain power supply in S3
 	/*if (platform_backlight_device) {
 		struct backlight_device *bd = platform_get_drvdata(platform_backlight_device);
@@ -244,15 +249,24 @@ static void s3_work(struct work_struct *dummy)
 
 static DECLARE_WORK(s3_work_struct, s3_work);
 
+extern int pm_autosleep_lock(void);
+extern void pm_autosleep_unlock(void);
+
 static void s3_suspend_callback(struct alarm *alarm)
 {
 //	extern void request_suspend_state(suspend_state_t state);
 
 	printk("s3_suspend_callback called\n");
 
-	wake_unlock(&s3_wake_lock);
+	//wake_unlock(&s3_wake_lock);
 //	request_suspend_state(PM_SUSPEND_MEM);
-	pm_suspend(PM_SUSPEND_MEM);
+	//int error = pm_autosleep_lock();
+	//if(error)
+	//	printk("Ambika : Sleep lock not acquired\n");
+	//pm_suspend(PM_SUSPEND_MEM);
+	//pm_autosleep_unlock();
+	schedule_work(&s3_work_struct);
+	
 }
 
 static void s3_timer_callback(struct alarm *alarm)
@@ -264,6 +278,7 @@ static void s3_timer_callback(struct alarm *alarm)
 		led_set_brightness(led0_cdev, LED_OFF);
 	gpio_set_value(UIB_LCD_LED_EN, 0);
 }
+
 
 // IRQ handler
 static irqreturn_t s3_irq(int irq, void *handle)
@@ -316,7 +331,7 @@ static irqreturn_t s3_irq(int irq, void *handle)
 		*/
 
 #ifdef CONFIG_MX6DL_UIB_REV_2
-		schedule_work(&s3_work_struct);
+		//schedule_work(&s3_work_struct);
 
 		// re-enabled in the timer callback
 		disable_irq_nosync(s3irq);
@@ -332,6 +347,7 @@ static irqreturn_t s3_irq(int irq, void *handle)
 		gpio_set_value(UIB_USB_HUB_RESET, 1);
 		mdelay(5);
 #endif
+		
 		alarmtime = ktime_add_ns(ktime_get_real(), (u64) s3_timeout * 1000 * 1000 / 2);
 		printk("setting s3_suspend to fire in %ums\n", s3_timeout / 2);
 		alarm_start(&s3_suspend, alarmtime);
@@ -387,11 +403,11 @@ static int __init s3_irq_init(void)
 	}
 
 # ifdef UIB_S3_PWR_MODE
-	dev = bus_find_device_by_name(&platform_bus_type, NULL, "leds-gpio");
+	dev = bus_find_device_by_name(&platform_bus_type, NULL, "leds.16");
 
 	if(!dev)
 	{
-		printk(KERN_ERR "failed to find device for cell leds-gpio\n");
+		printk(KERN_ERR "failed to find device for leds\n");
 	}
 	dev = device_find_child(dev, "led0", leddev_check);
 	if(dev) {
@@ -549,7 +565,12 @@ int __init uib_board_init(void)
 	int ret1 = gpio_request(UIB_S3_PWR_MODE, "s3-pwr-mode") ;
 	if(ret1)
 		printk("Ambika : UIB_S3_PWR_MODE gpio req failed %d ", ret1);
+	else
+		printk("Ambika UIB_S3_PWR_MODE GPIO Requesr pass\n");
 	gpio_direction_input(UIB_S3_PWR_MODE);
+        int state = get_S3_PWR_MODE()	;
+	printk("Ambika: S3 Power mode = %d\n", state);
+	
 	gpio_export(UIB_S3_PWR_MODE, false);
 # endif /* UIB_S3_PWR_MODE */
 #endif

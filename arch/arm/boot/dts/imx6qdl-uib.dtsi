@@ -27,7 +27,7 @@
 
 		led0 {
 		        gpios = <&gpio1 2 0>;
-		        default-state = "on";
+		        default-state = "off";
 		};
 
 	};
@@ -276,6 +276,7 @@
 				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x1b0b0
 				MX6QDL_PAD_EIM_D30__GPIO3_IO30  0x80000000
 				MX6QDL_PAD_EIM_D31__GPIO3_IO31  0x80000000
+				MX6QDL_PAD_KEY_COL4__GPIO4_IO14 0x80000000
 			>;
 		};
 
@@ -353,7 +354,6 @@
 		pinctrl_pcie: pciegrp {
 			fsl,pins = <
 				MX6QDL_PAD_GPIO_0__GPIO1_IO00	0x1b0b0
-				MX6QDL_PAD_KEY_COL4__GPIO4_IO14 0x1b0b0
 			>;
 		};
 

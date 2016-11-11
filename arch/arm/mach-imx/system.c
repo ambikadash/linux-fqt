@@ -116,6 +116,61 @@ void do_switch_fastboot(void)
 	}
 	iounmap(addr);
 }
+
+#define SRC_GPR9                        0x40
+#define SRC_GPR10                       0x44
+#define BOOT_MODE_SERIAL_ROM                  (0x00000030)
+#define PERSIST_WATCHDOG_RESET_BOOT           (0x10000000)
+
+void do_switch_mfgmode(void)
+{
+	void *addr;
+        u32 reg;
+		
+	addr = ioremap(MX6Q_SRC_BASE_ADDR, SZ_4K);
+	if (!addr) {
+                 pr_warn("MX6Q_SRC_BASE_ADDR ioremap failed!\n");
+                 return;
+        }
+
+        /*
+         * During reset, if GPR10[28] is 1, ROM will copy GPR9[25:0]
+         * to SBMR1, which will determine what is the boot device.
+         * Here SERIAL_ROM mode is selected
+         */
+        reg = __raw_readl(addr + SRC_GPR9);
+        reg |= BOOT_MODE_SERIAL_ROM;
+        __raw_writel(reg, addr + SRC_GPR9);
+
+        reg = __raw_readl(addr + SRC_GPR10);
+        reg |= PERSIST_WATCHDOG_RESET_BOOT;
+        __raw_writel(reg, addr + SRC_GPR10);
+	iounmap(addr);
+}
+
+void mxc_clear_mfgmode(void)
+{
+	void *addr;
+        u32 reg;
+
+	addr = ioremap(MX6Q_SRC_BASE_ADDR, SZ_4K);
+        if (!addr) {
+                 pr_warn("MX6Q_SRC_BASE_ADDR ioremap failed!\n");
+                 return;
+        }
+
+        reg = __raw_readl(addr + SRC_GPR9);
+
+        reg &= ~BOOT_MODE_SERIAL_ROM;
+        __raw_writel(reg, addr + SRC_GPR9);
+
+        reg = __raw_readl(addr + SRC_GPR10);
+        reg &= ~PERSIST_WATCHDOG_RESET_BOOT;
+        __raw_writel(reg, addr + SRC_GPR10);
+
+	iounmap(addr);
+}
+
 #endif
 
 static void arch_reset_special_mode(char mode, const char *cmd)
@@ -125,6 +180,8 @@ static void arch_reset_special_mode(char mode, const char *cmd)
 		do_switch_recovery();
 	else if (cmd && strcmp(cmd, "bootloader") == 0)
 		do_switch_fastboot();
+	else if (cmd && strcmp(cmd, "download") == 0)
+                do_switch_mfgmode();
 #endif
 }
 

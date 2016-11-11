@@ -927,6 +927,8 @@ static bool core_has_os_save_restore(void)
 
 static void reset_ctrl_regs(void *unused)
 {
+
+	return;
 	int i, raw_num_brps, err = 0, cpu = smp_processor_id();
 	u32 val;
 

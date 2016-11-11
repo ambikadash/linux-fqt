@@ -60,6 +60,8 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/time.h>
+#include "common.h"
+#include "hardware.h"
 
 
 #include <../drivers/leds/leds.h>
@@ -152,7 +154,38 @@
 #define OBSRV_MUX1_ENET_IRQ		0x9
 
 static int board_version = 2;
-//#define UOG_PORTSC1         USBOTG_REG32(0x184)
+
+#define AIPS2_ARB_BASE_ADDR             0x02100000
+#define AIPS2_OFF_BASE_ADDR             (AIPS2_ARB_BASE_ADDR + 0x80000)
+#define MX6Q_USB_OTG_BASE_ADDR          (AIPS2_OFF_BASE_ADDR + 0x4000)
+//#define UOG_PORTSC1_PHY		(void __force __iomem *)(MX6Q_USB_OTG_BASE_ADDR + 0x184)
+//#define UOG_PORTSC1	(*((volatile u32 __force *)(UOG_PORTSC1_PHY)))
+
+
+//#define PERIPBASE_VIRT                  0xF2000000
+//#define MX6_IO_ADDRESS(x) (void __force __iomem *)((x) + PERIPBASE_VIRT)
+
+/*#define IMX_IO_P2V(x)   (                       \
+                (0xf4000000 +                   \
+                (((x) & 0x50000000) >> 4) +     \
+                (((x) & 0x0a000000) >> 4) +     \
+                (((x) & 0x00ffffff))))*/
+
+
+#define OTG_BASE_ADDR ((void __iomem *)(IMX_IO_P2V (MX6Q_USB_OTG_BASE_ADDR)))
+#define USB_OTGREGS_BASE        (OTG_BASE_ADDR + 0x000)
+
+
+//#define USB_OTG_OFFSET (MX6Q_USB_OTG_BASE_ADDR+0x184)
+//#define UOG_PORTSC1_VIRT   MX6Q_IO_ADDRESS(USB_OTG_OFFSET) 
+//#define USBOTG_REG32(x)        (*((volatile u32 __force *)(x)))
+//#define UOG_PORTSC1 USBOTG_REG32(UOG_PORTSC1_VIRT)
+
+#define USBOTG_REG32(offset)        (*((volatile u32 __force *)(OTG_BASE_ADDR + (offset))))
+//#define UOG_PORTSC1	USBOTG_REG32(0x184)
+//#define USB_UOG_ID	USBOTG_REG32(0x000)
+
+#define PORTSC_PORT_FORCE_RESUME       (0x1<<6)
 
 static void sabresd_suspend_enter(void)
 {
@@ -190,16 +223,42 @@ void request_host_on(void)
 	state = get_S3_PWR_MODE();
 #endif
 	printk(KERN_ERR "request_host_on: %d\n", state);
+	//u32 Id = USB_UOG_ID;
+        //printk(KERN_ERR "%s: UOG_UOG_ID = %x\n", __func__, Id);
+
 	if (state) {
 #ifdef USE_FIERY_ON_EN
 		// wake up the Fiery if it's sleeping (S3_PWR_MODE is high)
 		// this should be driven low once S3_PWR_MODE goes low
 		gpio_set_value(UIB_FIERY_ON_EN, 1);
 #else
-		/*u32 tmp = UOG_PORTSC1;
-		printk(KERN_ERR "%s: UOG_PORTSC1 = %x\n", __func__, tmp);
-		tmp |= PORTSC_PORT_FORCE_RESUME;
-		UOG_PORTSC1 = tmp;*/
+		u32 UOG_PORTSC1;
+		printk("Ambika: Writing to UOG_PORTSC1");
+		void __iomem * ptr = ioremap(MX6Q_USB_OTG_BASE_ADDR+0x184, SZ_4K);
+		if(!ptr)
+		{
+			printk("Ambika: ioremap failed");
+			return;
+		}
+		else
+		{
+			UOG_PORTSC1 = ioread32(ptr);
+			printk(KERN_ERR "%s: UOG_PORTSC1 = %x\n", __func__, UOG_PORTSC1);
+			
+			
+			//u32 UOG_PORTSC1 = (*((volatile u32 __force *)(ptr)));
+
+			//UOG_PORTSC1
+			u32 tmp = UOG_PORTSC1;
+			//u32 Id = USB_UOG_ID;
+			//printk(KERN_ERR "%s: UOG_UOG_ID = %x\n", __func__, Id);
+			printk(KERN_ERR "%s: UOG_PORTSC1 = %x\n", __func__, tmp);	
+			tmp |= PORTSC_PORT_FORCE_RESUME;
+			//UOG_PORTSC1 = tmp;
+			iowrite32(tmp ,ptr);
+		}
+		iounmap(ptr);
+
 #endif
 	}
 }
@@ -232,10 +291,11 @@ module_param(s3_timeout, uint, S_IRUGO | S_IWUSR);
 struct led_classdev *led0_cdev;
 
 //extern struct bus_type 
-
+extern int console_suspend_enabled;
 static void s3_work(struct work_struct *dummy)
 {
 	wake_unlock(&s3_wake_lock);
+	console_suspend_enabled = 0;
 	pm_suspend(PM_SUSPEND_MEM);
 	// turn up LCD panel's backlight to drain power supply in S3
 	/*if (platform_backlight_device) {
@@ -247,7 +307,18 @@ static void s3_work(struct work_struct *dummy)
 	}*/
 }
 
+static void s3_work_timer(struct work_struct *dummy)
+{
+	enable_irq(s3irq);
+        // power down LED backlight
+        if(led0_cdev)
+                led_set_brightness(led0_cdev, LED_OFF);
+        gpio_set_value(UIB_LCD_LED_EN, 0);	
+}
+
+
 static DECLARE_WORK(s3_work_struct, s3_work);
+static DECLARE_WORK(s3_timer_struct, s3_work_timer);
 
 extern int pm_autosleep_lock(void);
 extern void pm_autosleep_unlock(void);
@@ -272,11 +343,12 @@ static void s3_suspend_callback(struct alarm *alarm)
 static void s3_timer_callback(struct alarm *alarm)
 {
 	printk("s3_timer_callback called at %llu\n", ktime_to_ns(ktime_get()));
-	enable_irq(s3irq);
+	schedule_work(&s3_timer_struct);
+	//enable_irq(s3irq);
 	// power down LED backlight
-	if(led0_cdev)
-		led_set_brightness(led0_cdev, LED_OFF);
-	gpio_set_value(UIB_LCD_LED_EN, 0);
+	//if(led0_cdev)
+	//	led_set_brightness(led0_cdev, LED_OFF);
+	//gpio_set_value(UIB_LCD_LED_EN, 0);
 }
 
 
@@ -352,7 +424,7 @@ static irqreturn_t s3_irq(int irq, void *handle)
 		printk("setting s3_suspend to fire in %ums\n", s3_timeout / 2);
 		alarm_start(&s3_suspend, alarmtime);
 
-		alarmtime = ktime_add_ns(ktime_get_real(), (u64) s3_timeout * 1000 * 1000);
+		alarmtime = ktime_add_ns(ktime_get_real(), (u64) (s3_timeout * 1000 * 1000 /2 - 100));
 		printk("setting s3_timeout to fire in %ums\n", s3_timeout);
 		alarm_start(&s3_timer, alarmtime);
 	}
@@ -448,6 +520,8 @@ static int __init s3_irq_init(void)
 		s3_irq(irq, (void *) wakeup_input);
 	enable_irq_wake(irq);
 	spin_unlock_irq(&lock);
+
+
 # endif /* UIB_S3_PWR_MODE */
 
 	return 0;

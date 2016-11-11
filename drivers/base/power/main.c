@@ -531,7 +531,7 @@ static void dpm_resume_noirq(pm_message_t state)
         if (!get_ssd_irq())
 	{	
 		printk("Ambika: calling pm_suspend(PM_SUSPEND_ON)");
-		//pm_suspend(PM_SUSPEND_ON);
+		pm_suspend(PM_SUSPEND_ON);
 	}
                 /*request_suspend_state(PM_SUSPEND_ON);*/
 

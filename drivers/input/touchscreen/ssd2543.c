@@ -488,6 +488,7 @@ static enum hrtimer_restart ssd_ts_timer(struct hrtimer *timer)
 
 static int ssd2543_ts_resume(struct device *dev)
 {
+	extern void request_host_on(void);
 	struct i2c_client *client = to_i2c_client(dev);
 	struct ssl_ts_priv *ts = i2c_get_clientdata(client);
 	unsigned char buf[4]={0};
@@ -495,6 +496,7 @@ static int ssd2543_ts_resume(struct device *dev)
 
 	dev_info(&ts->client->dev, "%s\n", __func__);
 	printk("ssd2543_ts_resume called\n");
+	request_host_on();
 
 #ifdef CONFIG_MX6DL_UIB_REV_2
 	// power up LCD panel
@@ -547,7 +549,6 @@ static int ssd2543_ts_suspend(struct device *dev)
 
 static const struct dev_pm_ops ssd2543_ts_pm_ops = {
         SET_SYSTEM_SLEEP_PM_OPS(ssd2543_ts_suspend, ssd2543_ts_resume)
-        SET_RUNTIME_PM_OPS(ssd2543_ts_suspend, ssd2543_ts_resume, NULL)
 };
 
 //static SIMPLE_DEV_PM_OPS(ssd2543_ts_pm_ops, ssd2543_ts_suspend, ssd2543_ts_resume);

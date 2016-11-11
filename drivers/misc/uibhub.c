@@ -13,8 +13,8 @@
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/slab.h>
-#ifdef CONFIG_HAS_EARLYSUSPEND
-# include <linux/earlysuspend.h>
+#ifdef CONFIG_PM_SLEEP
+# include <linux/suspend.h>
 #endif
 //#include <mach/hardware.h>
 #include <linux/of.h>
@@ -30,9 +30,6 @@
 struct uib_hub_priv {
 	struct i2c_client	*client;
 	spinlock_t			lock;
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend early_suspend;
-#endif 
 };
 #define IMX_GPIO_NR(bank, nr)           (((bank) - 1) * 32 + (nr))
 #define UIB_USB_HUB_RESET    IMX_GPIO_NR(5, 30)
@@ -101,10 +98,11 @@ static int hub_i2c_write(struct i2c_client *client, uint8_t reg, uint8_t data)
 	return ret;
 }
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static void uibhub_late_resume(struct early_suspend *early_s)
+#ifdef CONFIG_PM_SLEEP
+static int uibhub_late_resume(struct device * dev)
 {
-	struct uib_hub_priv *hub = container_of(early_s, struct uib_hub_priv, early_suspend);
+	struct i2c_client *client = to_i2c_client(dev);
+	struct uib_hub_priv *hub = i2c_get_clientdata(client);
 	unsigned char status = 0xff;
 	extern void request_host_on(void);
 
@@ -119,10 +117,12 @@ static void uibhub_late_resume(struct early_suspend *early_s)
 
 	msleep(5);
 	request_host_on();
+	return 0;
 }
-static void uibhub_early_suspend(struct early_suspend *early_s)
+static int uibhub_early_suspend(struct device * dev)
 {
-	struct uib_hub_priv *hub = container_of(early_s, struct uib_hub_priv, early_suspend);
+	struct i2c_client *client = to_i2c_client(dev);
+        struct uib_hub_priv *hub = i2c_get_clientdata(client);
 	unsigned char status = 0xff;
 
 /* moved reset code to S3 interrupt handler so it can be deferred until the fiery goes to sleep
@@ -136,11 +136,22 @@ static void uibhub_early_suspend(struct early_suspend *early_s)
 	gpio_set_value(HUB_gpios[0], 1);
 	mdelay(5);
 */
+	/*gpio_set_value(UIB_USB_HUB_RESET, 0);
+        mdelay(5);
+        gpio_set_value(UIB_USB_HUB_RESET, 1);
+        mdelay(5);*/
+
 
 	hub_i2c_read(hub->client, STATUS_REG, &status);
 	dev_info(&hub->client->dev, "%s: status = %x\n", __func__, status);
+	return 0;
 }
-#endif /* CONFIG_HAS_EARLYSUSPEND */
+
+static SIMPLE_DEV_PM_OPS(uibhub_pm_ops, uibhub_early_suspend, uibhub_late_resume);
+
+#endif /* CONFIG_PM_SLEEP */
+
+//#define UIB_USB_HUB_RESET    IMX_GPIO_NR(5, 30)
 
 static int uibhub_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
@@ -150,8 +161,13 @@ static int uibhub_probe(struct i2c_client *client,
 	unsigned char status;
 	int err = 0;
 	/* reset GPIO NR passed in dev.platform_data */
-	unsigned int *HUB_gpios = (unsigned int *) client->dev.platform_data;
+	//unsigned int *HUB_gpios = (unsigned int *) client->dev.platform_data;
+
+	
 	printk("Ambika: uibhub_probe called\n");
+
+	gpio_request(UIB_USB_HUB_RESET, "HUB-RESET");
+	gpio_direction_output(UIB_USB_HUB_RESET, 1);
 
 	dev_err(&client->dev, "%s:\n",__func__);
  
@@ -222,12 +238,8 @@ static int uibhub_probe(struct i2c_client *client,
 		"%s: registered hub: VID = %02x%02x, PID = %02x%02x, status = %x\n",
 		__func__, buf[1], buf[0], buf[3], buf[2], status);
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	gpio_direction_output(HUB_gpios[0], 1);
-	hub->early_suspend.suspend = uibhub_early_suspend;
-	hub->early_suspend.resume  = uibhub_late_resume;
-	hub->early_suspend.level   = EARLY_SUSPEND_LEVEL_BLANK_SCREEN-2;
-	register_early_suspend(&hub->early_suspend);
+#ifdef CONFIG_PM_SLEEP
+	gpio_direction_output(UIB_USB_HUB_RESET, 1);
 #endif
 
 	return 0;
@@ -264,6 +276,9 @@ static struct i2c_driver uibhub_driver = {
 		.owner	= THIS_MODULE,
 		.name	= "uibhub",
 		.of_match_table = uib_dt_ids, 
+#ifdef CONFIG_PM_SLEEP
+        	.pm = &uibhub_pm_ops,
+#endif
 	},
 	.id_table	= uibhub_idtable,
 	.probe		= uibhub_probe,

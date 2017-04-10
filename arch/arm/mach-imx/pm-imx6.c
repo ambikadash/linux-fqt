@@ -803,6 +803,7 @@ static int imx6q_pm_enter(suspend_state_t state)
 		imx6q_set_lpm(WAIT_CLOCKED);
 		break;
 	case PM_SUSPEND_MEM:
+		pr_warn("Ambika entering sleep \n");
 		imx6q_set_lpm(STOP_POWER_OFF);
 		imx6q_set_int_mem_clk_lpm(false);
 		imx6q_enable_wb(true);

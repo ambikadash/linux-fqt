@@ -205,6 +205,8 @@ static int snvs_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	u32 lpcr;
 
 	rtc_tm_to_time(alrm_tm, &time);
+	printk("Ambika snvs_rtc_set_alarm called for time %ul", time);
+	//dump_stack();
 
 	clk_enable(data->clk);
 	spin_lock_irqsave(&data->lock, flags);
@@ -358,6 +360,8 @@ err_rtc:
 static int snvs_rtc_suspend(struct device *dev)
 {
 	struct snvs_rtc_data *data = dev_get_drvdata(dev);
+	printk("Ambika snvs_rtc_suspend called %d ", data->irq);
+	//dump_stack();
 
 	if (device_may_wakeup(dev))
 		enable_irq_wake(data->irq);
@@ -368,6 +372,9 @@ static int snvs_rtc_suspend(struct device *dev)
 static int snvs_rtc_resume(struct device *dev)
 {
 	struct snvs_rtc_data *data = dev_get_drvdata(dev);
+        printk("Ambika snvs_rtc_resume called");
+        //dump_stack();
+	
 
 	if (device_may_wakeup(dev))
 		disable_irq_wake(data->irq);

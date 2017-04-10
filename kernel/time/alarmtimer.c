@@ -219,6 +219,8 @@ EXPORT_SYMBOL_GPL(alarm_expires_remaining);
  */
 static int alarmtimer_suspend(struct device *dev)
 {
+	
+	return 0;//Ambika removing alarm setting during suspend time.
 	struct rtc_time tm;
 	ktime_t min, now;
 	unsigned long flags;

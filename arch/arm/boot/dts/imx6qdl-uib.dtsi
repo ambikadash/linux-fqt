@@ -201,6 +201,11 @@
 
 };
 
+&gpc {
+    fsl,ldo-bypass = <1>;
+};
+
+
 &cpu0 {
         arm-supply = <&sw4_reg>;
 };
@@ -221,6 +226,11 @@
                 reg = <0x40>;
 	};
 
+	uibhub@44 {
+                compatible = "efi,uibhub";
+                reg = <0x44>;
+        };
+
 };
 
 &i2c2 {
@@ -239,7 +249,7 @@
                         sw4_reg: vddarmsoc_ext {
                                 regulator-min-microvolt = <900000>;
                                 regulator-max-microvolt = <1350000>;
-                                lltc,fb-voltage-divider = <100000 113793>;
+                                lltc,fb-voltage-divider = <174000 200000>;
                                 regulator-ramp-delay = <7000>;
                                 regulator-boot-on;
                                 regulator-always-on;
